@@ -54,7 +54,7 @@ class Asset(models.Model):
         related_name="assets"
     )
     tags = models.ManyToManyField(Tag, blank=True, related_name="assets")
-    metadata = models.JSONField(blank=True, null=True)  # store custom fields
+    metadata = models.JSONField(blank=True, null=True)
     version = models.PositiveIntegerField(default=1)
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
 

@@ -59,12 +59,21 @@ export default function AssetsPage() {
         </Button>
       </Box>
 
-      {/* Only Admin and Editor can upload */}
-      {["admin", "editor"].includes(role) && (
-        <Box mt={6}>
-          <UploadDropzone token={token} onUploaded={onUploaded} />
-        </Box>
-      )}
+        {["admin", "editor"].includes(role) && <UploadDropzone token={token} onUploaded={onUploaded} />}
+        {assets.map(a => (
+            <Box key={a.id} borderWidth={1} p={3} borderRadius="md">
+            <Text fontWeight="bold">{a.title} (v{a.version})</Text>
+            <Text fontSize="sm">{a.description}</Text>
+            <Text fontSize="xs">{a.category?.name}</Text>
+
+        {(["admin"].includes(role) || (role === "editor" && a.uploaded_by.username === localStorage.getItem("username"))) &&
+            <Button size="xs" mt={1}>Edit</Button>
+            }
+
+            <a href={`${process.env.NEXT_PUBLIC_API_URL.replace("/api","")}${a.file}`} target="_blank" rel="noreferrer">Preview / Download</a>
+            </Box>
+        ))}
+
 
       <SimpleGrid columns={[1, 2, 3]} spacing={4} mt={6}>
         {assets.map((a) => (

@@ -2,13 +2,11 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework import routers
-from assets.views import UserViewSet, AssetViewSet, CategoryViewSet, TagViewSet, AssetVersionViewSet
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from assets.views import MyTokenObtainPairSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView
-
-class MyTokenObtainPairView(TokenObtainPairView):
-    serializer_class = MyTokenObtainPairSerializer
+from assets.views import (
+    UserViewSet, AssetViewSet, CategoryViewSet,
+    TagViewSet, AssetVersionViewSet, MyTokenObtainPairView
+)
+from rest_framework_simplejwt.views import TokenRefreshView
 
 router = routers.DefaultRouter()
 router.register(r"users", UserViewSet)

@@ -1,22 +1,18 @@
 # assets/serializers.py
 from rest_framework import serializers
 from .models import User, Asset, Category, Tag, AssetVersion
-# assets/serializers.py (add this at the bottom or top)
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         token['role'] = user.role
-        token['username'] = user.username  # add username to token
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
         data['role'] = self.user.role
-        data['username'] = self.user.username  # include in response body
         return data
 
 
@@ -25,21 +21,25 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "username", "email", "role"]
 
+
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ["id", "name"]
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ["id", "name"]
 
+
 class AssetVersionSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
     class Meta:
         model = AssetVersion
         fields = ["id", "file", "uploaded_at", "uploaded_by", "version"]
+
 
 class AssetSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
@@ -56,7 +56,6 @@ class AssetSerializer(serializers.ModelSerializer):
         read_only_fields = ("uploaded_by", "version", "uploaded_at", "versions")
 
     def create(self, validated_data):
-        # tags will be handled in viewset perform_create (or here if needed)
         tags_data = validated_data.pop("tags", [])
         asset = Asset.objects.create(**validated_data)
         for t in tags_data:
