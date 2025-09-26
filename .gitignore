@@ -1,0 +1,10 @@
+/dam_frontend/.next/
+.env
+.venv/
+__pycache__/
+*.pyc
+media/
+node_modules/
+*.sqlite3
+.vscode/
+.DS_Store
