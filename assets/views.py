@@ -4,6 +4,20 @@ from rest_framework.response import Response
 from django_filters import rest_framework as django_filters
 from .models import User, Asset, Category, Tag, AssetVersion
 from .serializers import UserSerializer, AssetSerializer, CategorySerializer, TagSerializer, AssetVersionSerializer
+# assets/serializers.py (add this at the bottom or top)
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = user.role  # Add role to JWT claims
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['role'] = self.user.role  # Include role in response body
+        return data
 
 class IsAdminEditorOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):

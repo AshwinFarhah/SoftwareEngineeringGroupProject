@@ -1,6 +1,20 @@
 # assets/serializers.py
 from rest_framework import serializers
 from .models import User, Asset, Category, Tag, AssetVersion
+# assets/serializers.py (add this at the bottom or top)
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = user.role  # Add role to JWT claims
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['role'] = self.user.role  # Include role in response body
+        return data
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
