@@ -6,8 +6,10 @@ from .models import User, Asset, Category, Tag, AssetVersion
 from .serializers import UserSerializer, AssetSerializer, CategorySerializer, TagSerializer, AssetVersionSerializer
 # assets/serializers.py (add this at the bottom or top)
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .serializers import MyTokenObtainPairSerializer
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    serializer_class = MyTokenObtainPairSerializer
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -34,6 +36,44 @@ class IsAdminEditorOrReadOnly(permissions.BasePermission):
             return True
         if getattr(request.user, "role", None) == "editor" and getattr(obj, "uploaded_by", None) == request.user:
             return True
+        return False
+
+# assets/views.py
+class AssetPermission(permissions.BasePermission):
+    """
+    Admin: full control
+    Editor: can edit own assets, upload
+    Viewer: only view/download
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # SAFE_METHODS = GET/HEAD/OPTIONS → anyone authenticated can view/download
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # POST = upload
+        if request.method == "POST":
+            return request.user.role in ["admin", "editor"]
+
+        # PUT/PATCH/DELETE
+        return request.user.role in ["admin", "editor"]
+
+    def has_object_permission(self, request, view, obj):
+        # SAFE_METHODS = preview/download
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Admin can edit any asset
+        if request.user.role == "admin":
+            return True
+
+        # Editor can edit own assets
+        if request.user.role == "editor" and obj.uploaded_by == request.user:
+            return True
+
         return False
 
 class UserViewSet(viewsets.ModelViewSet):

@@ -6,7 +6,7 @@ import UploadDropzone from "../components/UploadDropzone";
 export default function AssetsPage() {
   const [assets, setAssets] = useState([]);
   const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null); // store user role
+  const [role, setRole] = useState(null); // user role
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function AssetsPage() {
         headers: { Authorization: `Bearer ${t}` },
       });
       const data = await res.json();
-      setAssets(Array.isArray(data) ? data : []); // ensure assets is always an array
+      setAssets(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }
@@ -59,17 +59,12 @@ export default function AssetsPage() {
         </Button>
       </Box>
 
-      {/* Only show UploadDropzone if user is admin or editor */}
+      {/* Only Admin and Editor can upload */}
       {["admin", "editor"].includes(role) && (
         <Box mt={6}>
           <UploadDropzone token={token} onUploaded={onUploaded} />
         </Box>
       )}
-
-      {["admin"].includes(role) || (role === "editor" && a.uploaded_by?.id === userId) ? (
-            <Button size="xs" mt={1}>Edit</Button>
-        ) : null}
-
 
       <SimpleGrid columns={[1, 2, 3]} spacing={4} mt={6}>
         {assets.map((a) => (
@@ -80,11 +75,13 @@ export default function AssetsPage() {
             <Text fontSize="sm">{a.description}</Text>
             <Text fontSize="xs">{a.category?.name}</Text>
 
-            {/* Show edit button only for admin or editor who uploaded the asset */}
-            {["admin", "editor"].includes(role) && (
-              <Button size="xs" mt={1}>Edit</Button>
+            // Admin can edit any asset; Editor can edit only own assets
+            {(role === "admin" || (role === "editor" && a.uploaded_by?.username === localStorage.getItem("username"))) && (
+                <Button size="xs" mt={1}>Edit</Button>
             )}
 
+
+            {/* Preview / Download link available to all roles */}
             <a
               href={`${process.env.NEXT_PUBLIC_API_URL.replace("/api", "")}${a.file}`}
               target="_blank"

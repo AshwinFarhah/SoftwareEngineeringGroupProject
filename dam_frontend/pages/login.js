@@ -1,4 +1,3 @@
-// frontend/pages/login.js
 import { useState } from "react";
 import { Box, Input, Button, Heading, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -8,10 +7,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const router = useRouter();
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL; // e.g., http://127.0.0.1:8000/api
 
   async function onSubmit(e) {
     e.preventDefault();
+
     try {
       const res = await fetch(`${API_BASE}/token/`, {
         method: "POST",
@@ -22,12 +22,19 @@ export default function Login() {
       if (!res.ok) throw new Error("Login failed");
 
       const data = await res.json();
-      localStorage.setItem("access_token", data.access);
-      localStorage.setItem("refresh_token", data.refresh);
 
-      // Decode JWT to get role
+      // Store tokens
+      // after receiving data from API
+        localStorage.setItem("access_token", data.access);
+        localStorage.setItem("refresh_token", data.refresh);
+        localStorage.setItem("role", data.role);
+        localStorage.setItem("username", data.username); // store username
+
+
+      // Decode JWT to get role and user ID
       const payload = JSON.parse(atob(data.access.split(".")[1]));
       localStorage.setItem("role", payload.role);
+      localStorage.setItem("userId", payload.user_id); // store user ID for editor restrictions
 
       console.log("Logged in as role:", payload.role);
 
