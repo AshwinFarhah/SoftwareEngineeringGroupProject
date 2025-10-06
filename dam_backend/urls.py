@@ -7,6 +7,8 @@ from assets.views import (
     TagViewSet, AssetVersionViewSet, MyTokenObtainPairView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
+from django.conf import settings
+from django.conf.urls.static import static
 
 router = routers.DefaultRouter()
 router.register(r"users", UserViewSet)
@@ -25,3 +27,7 @@ urlpatterns = [
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("", home),
 ]
+
+# ✅ Serve media files during development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
