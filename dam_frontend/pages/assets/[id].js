@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import {
   Box, Heading, Text, Image, Button, VStack, HStack,
   Input, Textarea, Table, Thead, Tbody, Tr, Th, Td,
-  useToast, Divider, Spinner, Badge
+  useToast, Divider, Spinner, Badge, Modal, ModalOverlay,
+  ModalContent, ModalHeader, ModalBody, ModalCloseButton,
+  useDisclosure
 } from "@chakra-ui/react";
 import Layout from "../../components/Layout";
 
@@ -17,9 +19,10 @@ export default function AssetDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [updatedAsset, setUpdatedAsset] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [previewVersion, setPreviewVersion] = useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
-  // Fetch asset & versions on mount
   useEffect(() => {
     const t = localStorage.getItem("access_token");
     const r = localStorage.getItem("role");
@@ -66,12 +69,10 @@ export default function AssetDetails() {
     }
   }
 
-  // ----------------- Update Asset -----------------
   async function handleUpdate() {
     try {
       if (!token) return;
 
-      // ----------------- Editor submits update request -----------------
       if (role === "editor") {
         if (!updatedAsset.file) {
           toast({ title: "Please select a file to update.", status: "warning" });
@@ -93,9 +94,7 @@ export default function AssetDetails() {
           `${process.env.NEXT_PUBLIC_API_URL}/assets/${id}/request_update/`,
           {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`, // DO NOT set 'Content-Type'
-            },
+            headers: { Authorization: `Bearer ${token}` },
             body: formData,
           }
         );
@@ -108,9 +107,7 @@ export default function AssetDetails() {
           const errData = await res.json();
           toast({ title: errData.detail || "Failed to submit update request", status: "error" });
         }
-      }
-      // ----------------- Admin updates directly -----------------
-      else {
+      } else {
         const payload = {
           title: updatedAsset.title,
           description: updatedAsset.description,
@@ -237,7 +234,6 @@ export default function AssetDetails() {
                       placeholder="Description"
                       isRequired
                     />
-
                     <select
                       style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ccc" }}
                       value={updatedAsset.category || "Others"}
@@ -263,7 +259,6 @@ export default function AssetDetails() {
                       <option value="Archives">Archives</option>
                       <option value="Others">Others</option>
                     </select>
-
                     {updatedAsset.customCategory !== null && (
                       <Input
                         placeholder="Enter custom category"
@@ -271,34 +266,21 @@ export default function AssetDetails() {
                         onChange={e => setUpdatedAsset({ ...updatedAsset, customCategory: e.target.value })}
                       />
                     )}
-
                     <Input
                       placeholder="Tags (comma separated)"
                       value={updatedAsset.tags || ""}
                       onChange={e => setUpdatedAsset({ ...updatedAsset, tags: e.target.value })}
                     />
-
-                    {/* NEW: File input for editor update */}
                     {role === "editor" && (
                       <Input
                         type="file"
                         onChange={e => setUpdatedAsset({ ...updatedAsset, file: e.target.files[0] })}
                       />
                     )}
-
-                    <Button
-                      colorScheme="green"
-                      onClick={() => {
-                        if (!updatedAsset.title || !updatedAsset.description || !(updatedAsset.category || updatedAsset.customCategory)) {
-                          toast({ title: "Please fill in all required fields.", status: "warning" });
-                          return;
-                        }
-                        handleUpdate();
-                      }}
-                    >
-                      Save Changes
-                    </Button>
-                    <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
+                    <HStack spacing={2}>
+                      <Button colorScheme="green" onClick={handleUpdate}>Save Changes</Button>
+                      <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
+                    </HStack>
                   </VStack>
                 ) : (
                   <>
@@ -317,6 +299,7 @@ export default function AssetDetails() {
               </Box>
             </HStack>
 
+            {/* Version History Table */}
             {versions.length > 0 && (
               <>
                 <Divider my={6} />
@@ -344,12 +327,18 @@ export default function AssetDetails() {
                         </Td>
                         {role === "admin" && (
                           <Td>
-                            {v.status === "pending" && (
-                              <HStack>
-                                <Button size="sm" colorScheme="green" onClick={() => approveVersion(v.id, true)}>Approve</Button>
-                                <Button size="sm" colorScheme="red" onClick={() => approveVersion(v.id, false)}>Reject</Button>
-                              </HStack>
-                            )}
+                            <HStack spacing={2}>
+                              {v.status === "pending" && (
+                                <>
+                                  <Button size="sm" colorScheme="green" onClick={() => approveVersion(v.id, true)}>Approve</Button>
+                                  <Button size="sm" colorScheme="red" onClick={() => approveVersion(v.id, false)}>Reject</Button>
+                                  <Button size="sm" colorScheme="blue" onClick={() => {
+                                    setPreviewVersion(v);
+                                    onOpen();
+                                  }}>Preview Changes</Button>
+                                </>
+                              )}
+                            </HStack>
                           </Td>
                         )}
                       </Tr>
@@ -358,6 +347,49 @@ export default function AssetDetails() {
                 </Table>
               </>
             )}
+
+            {/* Preview Modal */}
+            {previewVersion && (
+                <Modal isOpen={isOpen} onClose={onClose} size="xl">
+                    <ModalOverlay />
+                    <ModalContent>
+                        <ModalHeader>Preview Pending Changes (v{previewVersion.version})</ModalHeader>
+                        <ModalCloseButton />
+                        <ModalBody>
+                            <Text><b>Title:</b> {previewVersion.title}</Text>
+                            <Text><b>Description:</b> {previewVersion.description}</Text>
+                            <Text><b>Category:</b> {previewVersion.category?.name || "Uncategorized"}</Text>
+                            <Text><b>Tags:</b> {previewVersion.tags?.map(t => t.name).join(", ") || "—"}</Text>
+
+                            {previewVersion.file ? (
+                                /\.(jpg|jpeg|png|webp)$/i.test(previewVersion.file) ? (
+                                    <Image
+                                        src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                                        maxH="300px"
+                                        mx="auto"
+                                        mt={3}
+                                        rounded="lg"
+                                        shadow="sm"
+                                    />
+                                ) : previewVersion.file.endsWith(".mp4") ? (
+                                    <video
+                                        src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                                        controls
+                                        width="100%"
+                                        style={{ borderRadius: "12px", marginTop: "12px" }}
+                                    />
+                                ) : (
+                                    <Text mt={3}>No file preview available.</Text>
+                                )
+                                ) : (
+                                    <Text mt={3}>No file preview available.</Text>
+                                )}
+                            </ModalBody>
+                        </ModalContent>
+                    </Modal>
+                )}
+
+
           </Box>
         ) : <Text>No asset found.</Text>}
       </Box>

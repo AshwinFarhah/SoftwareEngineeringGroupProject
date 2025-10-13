@@ -1,8 +1,20 @@
 // pages/metadata.js
 import { useEffect, useState } from "react";
 import {
-  Box, Heading, Input, Select, Button, VStack, SimpleGrid,
-  Text, HStack, FormControl, FormLabel, Spinner, Divider, useToast
+  Box,
+  Heading,
+  Input,
+  Select,
+  Button,
+  VStack,
+  SimpleGrid,
+  Text,
+  HStack,
+  FormControl,
+  FormLabel,
+  Spinner,
+  Divider,
+  useToast,
 } from "@chakra-ui/react";
 import Layout from "../components/Layout";
 import AssetCard from "../components/AssetCard";
@@ -21,6 +33,7 @@ export default function MetadataSearchPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const toast = useToast();
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const t = localStorage.getItem("access_token");
@@ -30,7 +43,7 @@ export default function MetadataSearchPage() {
     setRole(r);
     fetchCategories(t);
     fetchTags(t);
-    fetchAssets(t);
+    fetchAssets(t, page);
   }, [page]);
 
   async function fetchCategories(t) {
@@ -57,7 +70,7 @@ export default function MetadataSearchPage() {
     }
   }
 
-  async function fetchAssets(t) {
+  async function fetchAssets(t, currentPage = 1) {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -66,24 +79,41 @@ export default function MetadataSearchPage() {
       if (tag) queryParams.append("tags", tag);
       if (dateFrom) queryParams.append("date_from", dateFrom);
       if (dateTo) queryParams.append("date_to", dateTo);
-      queryParams.append("page", page);
+      queryParams.append("page", currentPage);
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/assets/?${queryParams.toString()}`,
         { headers: { Authorization: `Bearer ${t}` } }
       );
       const data = await res.json();
-      setAssets(Array.isArray(data.results) ? data.results : data);
+
+      // Safely extract results array
+      const assetList = Array.isArray(data.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
+        : [];
+      setAssets(assetList);
+
+      // Optional: handle total pages if API returns pagination info
+      if (data.count && data.results?.length) {
+        setTotalPages(Math.ceil(data.count / data.results.length));
+      } else {
+        setTotalPages(1);
+      }
     } catch (err) {
       console.error(err);
       toast({ title: "Failed to load assets", status: "error" });
+      setAssets([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   }
 
   function handleSearch() {
-    fetchAssets(token);
+    setPage(1); // reset to first page
+    fetchAssets(token, 1);
   }
 
   return (
@@ -172,7 +202,7 @@ export default function MetadataSearchPage() {
 
         {loading ? (
           <Spinner size="lg" />
-        ) : assets.length === 0 ? (
+        ) : !Array.isArray(assets) || assets.length === 0 ? (
           <Text color="gray.500">No assets found.</Text>
         ) : (
           <SimpleGrid columns={[1, 2, 3]} spacing={5}>
@@ -183,11 +213,21 @@ export default function MetadataSearchPage() {
         )}
 
         <HStack justify="center" mt={8} spacing={6}>
-          <Button onClick={() => setPage((p) => Math.max(1, p - 1))} isDisabled={page === 1}>
+          <Button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            isDisabled={page === 1}
+          >
             Previous
           </Button>
-          <Text>Page {page}</Text>
-          <Button onClick={() => setPage((p) => p + 1)}>Next</Button>
+          <Text>
+            Page {page} of {totalPages}
+          </Text>
+          <Button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            isDisabled={page === totalPages}
+          >
+            Next
+          </Button>
         </HStack>
       </Box>
     </Layout>
