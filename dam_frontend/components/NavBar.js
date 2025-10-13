@@ -17,13 +17,23 @@ export default function NavBar() {
         <Button variant="ghost" onClick={() => router.push("/dashboard")}>Dashboard</Button>
         <Button variant="ghost" onClick={() => router.push("/assets")}>Assets</Button>
         <Button variant="ghost" onClick={() => router.push("/metadata")}>Metadata</Button>
-        <Button variant="ghost" onClick={() => router.push("/search")}>Search</Button>
 
-        {/* 🔒 Only show for admins */}
+        {/* 🔒 Admin-only buttons */}
         {isAdmin && (
-          <Button variant="ghost" onClick={() => router.push("/admin/users")}>
-            Manage Users
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/admin/update-requests")}
+            >
+              Update Requests
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/admin/users")}
+            >
+              Manage Users
+            </Button>
+          </>
         )}
 
         <Spacer />

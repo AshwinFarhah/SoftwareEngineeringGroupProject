@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
-import { Box, Heading, Text, SimpleGrid, VStack, Button, Grid } from "@chakra-ui/react";
+import {
+  Box,
+  Heading,
+  Text,
+  SimpleGrid,
+  VStack,
+  Button,
+  Grid,
+  Divider,
+  HStack,
+} from "@chakra-ui/react";
 import Layout from "../components/Layout";
 import StatsCard from "../components/StatsCard";
 import AssetCard from "../components/AssetCard";
@@ -21,7 +31,7 @@ export default function Dashboard() {
       return;
     }
 
-    // Fetch counts from backend
+    // Fetch counts
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/assets/`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -64,6 +74,8 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
+  const lowerRole = role ? role.toLowerCase() : "";
+
   return (
     <Layout>
       <Box>
@@ -72,6 +84,7 @@ export default function Dashboard() {
           Welcome back — quick overview of your DAM system.
         </Text>
 
+        {/* Summary Cards */}
         <SimpleGrid columns={[1, 3]} spacing={4} mt={6}>
           <StatsCard title="Total Assets" value={counts.assets} subtitle="All uploaded files" />
           <StatsCard title="Categories" value={counts.categories} subtitle="Asset categories" />
@@ -79,6 +92,7 @@ export default function Dashboard() {
         </SimpleGrid>
 
         <Grid templateColumns={["1fr", "2fr 1fr"]} gap={6} mt={8}>
+          {/* Recent Uploads */}
           <Box>
             <Heading size="md" mb={4}>
               Recent Uploads
@@ -90,29 +104,73 @@ export default function Dashboard() {
             </SimpleGrid>
           </Box>
 
-          <Box bg="white" p={4} borderRadius="md" boxShadow="sm">
-            <Heading size="md" mb={3}>
+          {/* Quick Actions Panel */}
+          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm">
+            <Heading size="md" mb={4}>
               Quick Actions
             </Heading>
             <VStack spacing={3} align="stretch">
-                <Button colorScheme="blue" onClick={() => router.push("/assets")}>
+              {/* VIEWER ACTIONS */}
+              {lowerRole === "viewer" && (
+                <>
+                  <Button
+                    colorScheme="purple"
+                    variant="solid"
+                    onClick={() => router.push("/metadata")}
+                  >
+                    View Metadata
+                  </Button>
+                  <Button
+                    colorScheme="blue"
+                    variant="outline"
+                    onClick={() => router.push("/metadata")}
+                  >
+                    Search / Download Assets
+                  </Button>
+                </>
+              )}
+
+              {/* EDITOR + ADMIN ACTIONS */}
+              {(lowerRole === "editor" || lowerRole === "admin") && (
+                <>
+                  <Button
+                    colorScheme="blue"
+                    onClick={() => router.push("/assets")}
+                  >
                     Upload / Manage Assets
-                </Button>
-                <Button colorScheme="teal" onClick={() => router.push("/metadata")}>
+                  </Button>
+                  <Button
+                    colorScheme="teal"
+                    onClick={() => router.push("/metadata")}
+                  >
                     Manage Metadata
-                </Button>
-                <Button colorScheme="purple" onClick={() => router.push("/search")}>
-                    Search & Filters
-                </Button>
+                  </Button>
+                </>
+              )}
 
-                {/* 🔒 Only Admin can see this */}
-                {role && role.toLowerCase() === "admin" && (
-                <Button colorScheme="red" onClick={() => router.push("/admin/users")}>
-                    Manage Users
-                </Button>
-                )}
+              {/* ADMIN EXCLUSIVE */}
+              {lowerRole === "admin" && (
+                <>
+                  <Divider my={2} />
+                  <HStack justify="space-between">
+                    <Button
+                      colorScheme="red"
+                      flex="1"
+                      onClick={() => router.push("/admin/users")}
+                    >
+                      Manage Users
+                    </Button>
+                    <Button
+                      colorScheme="orange"
+                      flex="1"
+                      onClick={() => router.push("/admin/update-requests")}
+                    >
+                      Update Requests
+                    </Button>
+                  </HStack>
+                </>
+              )}
             </VStack>
-
           </Box>
         </Grid>
       </Box>
