@@ -129,7 +129,7 @@ export default function AssetsPage() {
       formData.append("file", selectedFile);
       formData.append("title", title);
       formData.append("description", description);
-      if (finalCategoryId) formData.append("category", finalCategoryId);
+      if (finalCategoryId) formData.append("category_id", finalCategoryId);
       if (tag) formData.append("tags", tag);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/assets/`, {

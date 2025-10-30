@@ -98,7 +98,7 @@ class AssetVersionSerializer(serializers.ModelSerializer):
 # ✅ Asset Serializer (always returns latest approved version)
 class AssetSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
-    category = CategorySerializer(read_only=True)
+    category_id = serializers.IntegerField(write_only=True, required=False)
     tags = TagSerializer(many=True, read_only=True)
     versions = AssetVersionSerializer(many=True, read_only=True)
 
@@ -111,7 +111,7 @@ class AssetSerializer(serializers.ModelSerializer):
             "file",
             "uploaded_at",
             "uploaded_by",
-            "category",
+            "category_id",
             "tags",
             "metadata",
             "version",

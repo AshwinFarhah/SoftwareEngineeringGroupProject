@@ -1,3 +1,4 @@
+"use client";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import {
@@ -44,8 +45,7 @@ export default function AssetDetails() {
       setUpdatedAsset({
         title: data.title || "",
         description: data.description || "",
-        category: data.category?.name || "",
-        customCategory: "",
+        category_id: data.category?.id || "",
         tags: data.tags?.map(t => t.name).join(",") || "",
         file: null,
       });
@@ -73,6 +73,7 @@ export default function AssetDetails() {
     try {
       if (!token) return;
 
+      // === Editors submit update requests ===
       if (role === "editor") {
         if (!updatedAsset.file) {
           toast({ title: "Please select a file to update.", status: "warning" });
@@ -83,11 +84,7 @@ export default function AssetDetails() {
         formData.append("file", updatedAsset.file);
         if (updatedAsset.title) formData.append("title", updatedAsset.title);
         if (updatedAsset.description) formData.append("description", updatedAsset.description);
-        if (updatedAsset.customCategory) {
-          formData.append("category", updatedAsset.customCategory);
-        } else if (updatedAsset.category) {
-          formData.append("category", updatedAsset.category);
-        }
+        if (updatedAsset.category_id) formData.append("category_id", updatedAsset.category_id);
         if (updatedAsset.tags) formData.append("tags", updatedAsset.tags);
 
         const res = await fetch(
@@ -107,21 +104,20 @@ export default function AssetDetails() {
           const errData = await res.json();
           toast({ title: errData.detail || "Failed to submit update request", status: "error" });
         }
+
+      // === Admins update directly ===
       } else {
-        const payload = {
-          title: updatedAsset.title,
-          description: updatedAsset.description,
-          category: updatedAsset.customCategory || updatedAsset.category || "",
-          tags: updatedAsset.tags || "",
-        };
+        const formData = new FormData();
+        if (updatedAsset.file) formData.append("file", updatedAsset.file);
+        formData.append("title", updatedAsset.title);
+        formData.append("description", updatedAsset.description);
+        if (updatedAsset.category_id) formData.append("category_id", updatedAsset.category_id);
+        if (updatedAsset.tags) formData.append("tags", updatedAsset.tags);
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/assets/${id}/`, {
           method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
         });
 
         if (res.ok) {
@@ -214,7 +210,35 @@ export default function AssetDetails() {
 
                 <HStack justify="center" mt={4}>
                   <Button colorScheme="blue" onClick={() => window.open(fullUrl, "_blank")}>Open</Button>
-                  <Button onClick={() => window.open(fullUrl, "_blank")}>Download</Button>
+                  <Button
+                     colorScheme="teal"
+                            onClick={async () => {
+                            try {
+                                const res = await fetch(fullUrl, {
+                                 headers: { Authorization: `Bearer ${token}` },
+                              });
+                                 if (!res.ok) throw new Error("Failed to fetch file");
+
+                                const blob = await res.blob();
+                                 const url = window.URL.createObjectURL(blob);
+
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.download = asset.title || "download";
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+
+                                window.URL.revokeObjectURL(url);
+                                } catch (err) {
+                             console.error("Download failed:", err);
+                             toast({ title: "Download failed", status: "error" });
+                        }
+                            }}
+                            >
+                        Download
+                    </Button>
+
                 </HStack>
               </Box>
 
@@ -236,47 +260,31 @@ export default function AssetDetails() {
                     />
                     <select
                       style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ccc" }}
-                      value={updatedAsset.category || "Others"}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setUpdatedAsset({
-                          ...updatedAsset,
-                          category: val === "Others" ? "" : val,
-                          customCategory: val === "Others" ? "" : null,
-                        });
-                      }}
+                      value={updatedAsset.category_id || ""}
+                      onChange={e => setUpdatedAsset({ ...updatedAsset, category_id: e.target.value })}
                     >
                       <option value="">Select Category</option>
-                      <option value="Images">Images</option>
-                      <option value="Videos">Videos</option>
-                      <option value="Documents">Documents</option>
-                      <option value="Audio">Audio</option>
-                      <option value="Presentations">Presentations</option>
-                      <option value="Spreadsheets">Spreadsheets</option>
-                      <option value="Animations">Animations</option>
-                      <option value="Motion Graphics">Motion Graphics</option>
-                      <option value="3D Models">3D Models</option>
-                      <option value="Archives">Archives</option>
-                      <option value="Others">Others</option>
+                      <option value="1">Images</option>
+                      <option value="2">Videos</option>
+                      <option value="3">Documents</option>
+                      <option value="4">Audio</option>
+                      <option value="5">Presentations</option>
+                      <option value="6">Spreadsheets</option>
+                      <option value="7">Animations</option>
+                      <option value="8">Motion Graphics</option>
+                      <option value="9">3D Models</option>
+                      <option value="10">Archives</option>
+                      <option value="11">Others</option>
                     </select>
-                    {updatedAsset.customCategory !== null && (
-                      <Input
-                        placeholder="Enter custom category"
-                        value={updatedAsset.customCategory || ""}
-                        onChange={e => setUpdatedAsset({ ...updatedAsset, customCategory: e.target.value })}
-                      />
-                    )}
                     <Input
                       placeholder="Tags (comma separated)"
                       value={updatedAsset.tags || ""}
                       onChange={e => setUpdatedAsset({ ...updatedAsset, tags: e.target.value })}
                     />
-                    {role === "editor" && (
-                      <Input
-                        type="file"
-                        onChange={e => setUpdatedAsset({ ...updatedAsset, file: e.target.files[0] })}
-                      />
-                    )}
+                    <Input
+                      type="file"
+                      onChange={e => setUpdatedAsset({ ...updatedAsset, file: e.target.files[0] })}
+                    />
                     <HStack spacing={2}>
                       <Button colorScheme="green" onClick={handleUpdate}>Save Changes</Button>
                       <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
@@ -290,7 +298,7 @@ export default function AssetDetails() {
                     <Text><b>Category:</b> {asset.category?.name || "Uncategorized"}</Text>
                     <Text><b>Uploaded:</b> {new Date(asset.uploaded_at).toLocaleString()}</Text>
 
-                    {role && (
+                    {(role === "admin" || role === "editor") && (
                       <Button mt={4} colorScheme="teal" onClick={() => setIsEditing(true)}>Edit Metadata</Button>
                     )}
                     {role === "admin" && <Button mt={4} colorScheme="red" onClick={handleDelete}>Delete Asset</Button>}
@@ -299,7 +307,7 @@ export default function AssetDetails() {
               </Box>
             </HStack>
 
-            {/* Version History Table */}
+            {/* Version History */}
             {versions.length > 0 && (
               <>
                 <Divider my={6} />
@@ -335,7 +343,7 @@ export default function AssetDetails() {
                                   <Button size="sm" colorScheme="blue" onClick={() => {
                                     setPreviewVersion(v);
                                     onOpen();
-                                  }}>Preview Changes</Button>
+                                  }}>Preview</Button>
                                 </>
                               )}
                             </HStack>
@@ -350,46 +358,44 @@ export default function AssetDetails() {
 
             {/* Preview Modal */}
             {previewVersion && (
-                <Modal isOpen={isOpen} onClose={onClose} size="xl">
-                    <ModalOverlay />
-                    <ModalContent>
-                        <ModalHeader>Preview Pending Changes (v{previewVersion.version})</ModalHeader>
-                        <ModalCloseButton />
-                        <ModalBody>
-                            <Text><b>Title:</b> {previewVersion.title}</Text>
-                            <Text><b>Description:</b> {previewVersion.description}</Text>
-                            <Text><b>Category:</b> {previewVersion.category?.name || "Uncategorized"}</Text>
-                            <Text><b>Tags:</b> {previewVersion.tags?.map(t => t.name).join(", ") || "—"}</Text>
+              <Modal isOpen={isOpen} onClose={onClose} size="xl">
+                <ModalOverlay />
+                <ModalContent>
+                  <ModalHeader>Preview Pending Changes (v{previewVersion.version})</ModalHeader>
+                  <ModalCloseButton />
+                  <ModalBody>
+                    <Text><b>Title:</b> {previewVersion.title}</Text>
+                    <Text><b>Description:</b> {previewVersion.description}</Text>
+                    <Text><b>Category:</b> {previewVersion.category?.name || "Uncategorized"}</Text>
+                    <Text><b>Tags:</b> {previewVersion.tags?.map(t => t.name).join(", ") || "—"}</Text>
 
-                            {previewVersion.file ? (
-                                /\.(jpg|jpeg|png|webp)$/i.test(previewVersion.file) ? (
-                                    <Image
-                                        src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
-                                        maxH="300px"
-                                        mx="auto"
-                                        mt={3}
-                                        rounded="lg"
-                                        shadow="sm"
-                                    />
-                                ) : previewVersion.file.endsWith(".mp4") ? (
-                                    <video
-                                        src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
-                                        controls
-                                        width="100%"
-                                        style={{ borderRadius: "12px", marginTop: "12px" }}
-                                    />
-                                ) : (
-                                    <Text mt={3}>No file preview available.</Text>
-                                )
-                                ) : (
-                                    <Text mt={3}>No file preview available.</Text>
-                                )}
-                            </ModalBody>
-                        </ModalContent>
-                    </Modal>
-                )}
-
-
+                    {previewVersion.file ? (
+                      /\.(jpg|jpeg|png|webp)$/i.test(previewVersion.file) ? (
+                        <Image
+                          src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                          maxH="300px"
+                          mx="auto"
+                          mt={3}
+                          rounded="lg"
+                          shadow="sm"
+                        />
+                      ) : previewVersion.file.endsWith(".mp4") ? (
+                        <video
+                          src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                          controls
+                          width="100%"
+                          style={{ borderRadius: "12px", marginTop: "12px" }}
+                        />
+                      ) : (
+                        <Text mt={3}>No file preview available.</Text>
+                      )
+                    ) : (
+                      <Text mt={3}>No file preview available.</Text>
+                    )}
+                  </ModalBody>
+                </ModalContent>
+              </Modal>
+            )}
           </Box>
         ) : <Text>No asset found.</Text>}
       </Box>
