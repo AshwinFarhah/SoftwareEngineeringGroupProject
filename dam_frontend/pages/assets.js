@@ -6,6 +6,8 @@ import {
 } from "@chakra-ui/react";
 import Layout from "../components/Layout";
 import AssetCard from "../components/AssetCard";
+import UploadDropzone from "../components/UploadDropzone";
+
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState([]);
@@ -243,18 +245,17 @@ export default function AssetsPage() {
               </FormControl>
 
               <FormControl>
-                <FormLabel>File</FormLabel>
-                <Input type="file" onChange={handleFileChange} />
-              </FormControl>
 
-              {preview && (
-                <Box textAlign="center">
-                  <Text fontWeight="semibold" mb={2}>
-                    Preview:
-                  </Text>
-                  <Image src={preview} alt="Preview" maxH="200px" mx="auto" rounded="lg" />
-                </Box>
-              )}
+                <FormLabel>File</FormLabel>
+                    <UploadDropzone
+                    onFileSelected={(file) => {
+                    setSelectedFile(file);
+                        setPreview(URL.createObjectURL(file));
+                    }}
+                preview={preview}
+                />
+                </FormControl>
+
 
               <Button
                 colorScheme="blue"
