@@ -70,6 +70,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class AssetVersionSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
+    category = CategorySerializer(read_only=True)
     # Optional write-only fields if needed
     category_id = serializers.IntegerField(write_only=True, required=False)
     tag_names = serializers.CharField(write_only=True, required=False)
@@ -86,6 +87,7 @@ class AssetVersionSerializer(serializers.ModelSerializer):
             "comment",
             "title",
             "description",
+            "category",
             "category_id",
             "tags",
             "tag_names",
