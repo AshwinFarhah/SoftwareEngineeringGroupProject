@@ -1,11 +1,24 @@
+
 import { ChakraProvider } from "@chakra-ui/react";
+import { Provider } from "react-redux";
+import { store } from "../redux/store";
 import theme from "../theme";
+import useAuthInitializer from "../hooks/useAuthInitializer";
+
+function AppContent({ Component, pageProps }) {
+  const isReady = useAuthInitializer();
+
+  if (!isReady) return null; // wait until user state is restored
+  return <Component {...pageProps} />;
+}
 
 function MyApp({ Component, pageProps }) {
   return (
-    <ChakraProvider theme={theme}>
-      <Component {...pageProps} />
-    </ChakraProvider>
+    <Provider store={store}>
+      <ChakraProvider theme={theme}>
+        <AppContent Component={Component} pageProps={pageProps} />
+      </ChakraProvider>
+    </Provider>
   );
 }
 
