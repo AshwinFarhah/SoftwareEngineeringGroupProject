@@ -82,6 +82,7 @@ export default function AssetDetails() {
 
         const formData = new FormData();
         formData.append("file", updatedAsset.file);
+        formData.append("category_id", updatedAsset.category_id);
         if (updatedAsset.title) formData.append("title", updatedAsset.title);
         if (updatedAsset.description) formData.append("description", updatedAsset.description);
         if (updatedAsset.category_id) formData.append("category_id", updatedAsset.category_id);
@@ -333,22 +334,30 @@ export default function AssetDetails() {
                             {v.status}
                           </Badge>
                         </Td>
-                        {role === "admin" && (
-                          <Td>
-                            <HStack spacing={2}>
-                              {v.status === "pending" && (
-                                <>
-                                  <Button size="sm" colorScheme="green" onClick={() => approveVersion(v.id, true)}>Approve</Button>
-                                  <Button size="sm" colorScheme="red" onClick={() => approveVersion(v.id, false)}>Reject</Button>
-                                  <Button size="sm" colorScheme="blue" onClick={() => {
-                                    setPreviewVersion(v);
-                                    onOpen();
-                                  }}>Preview</Button>
-                                </>
-                              )}
-                            </HStack>
-                          </Td>
-                        )}
+                        <Td>
+  <HStack spacing={2}>
+    {/* View button for everyone */}
+    <Button
+      size="sm"
+      colorScheme="blue"
+      onClick={() => {
+        setPreviewVersion(v);
+        onOpen();
+      }}
+    >
+      View
+    </Button>
+
+    {/* Admin-only controls for pending versions */}
+    {role === "admin" && v.status === "pending" && (
+      <>
+        <Button size="sm" colorScheme="green" onClick={() => approveVersion(v.id, true)}>Approve</Button>
+        <Button size="sm" colorScheme="red" onClick={() => approveVersion(v.id, false)}>Reject</Button>
+      </>
+    )}
+  </HStack>
+</Td>
+
                       </Tr>
                     ))}
                   </Tbody>
@@ -372,7 +381,10 @@ export default function AssetDetails() {
                     {previewVersion.file ? (
                       /\.(jpg|jpeg|png|webp)$/i.test(previewVersion.file) ? (
                         <Image
-                          src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                          src={previewVersion.file?.startsWith("http")
+  ? previewVersion.file
+  : `${base}${previewVersion.file || ""}`
+}
                           maxH="300px"
                           mx="auto"
                           mt={3}
@@ -381,7 +393,10 @@ export default function AssetDetails() {
                         />
                       ) : previewVersion.file.endsWith(".mp4") ? (
                         <video
-                          src={previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`}
+                          src={previewVersion.file?.startsWith("http")
+  ? previewVersion.file
+  : `${base}${previewVersion.file || ""}`
+}
                           controls
                           width="100%"
                           style={{ borderRadius: "12px", marginTop: "12px" }}

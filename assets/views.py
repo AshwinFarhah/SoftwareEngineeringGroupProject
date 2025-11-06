@@ -221,17 +221,30 @@ class AssetVersionViewSet(viewsets.ModelViewSet):
         instance.status = status_value
         instance.save()
 
-        # On approval: update main asset with version data
+        # -------------------- APPROVAL LOGIC --------------------
         if status_value == "approved":
             asset = instance.asset
+
+            # Update metadata fields
             asset.title = instance.title or asset.title
             asset.description = instance.description or asset.description
             asset.category = instance.category or asset.category
+
             if instance.tags.exists():
                 asset.tags.set(instance.tags.all())
-            asset.file = instance.file or asset.file
+
+            # ✅ FIX: Do NOT overwrite file directly with same FileField instance
+            if instance.file and instance.file.name != asset.file.name:
+                # Keep old file intact — only point to the new version’s copy
+                asset.file.save(
+                    instance.file.name.split("/")[-1],  # just the filename
+                    instance.file.file,  # file object
+                    save=False  # prevent immediate save to avoid double delete
+                )
+
             asset.version = instance.version
             asset.save()
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
