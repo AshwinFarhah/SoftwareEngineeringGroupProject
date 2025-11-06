@@ -21,18 +21,63 @@ class MyTokenObtainPairView(TokenObtainPairView):
 # PERMISSIONS
 # ---------------------------------------------------------------------
 class IsAdminEditorOrReadOnly(permissions.BasePermission):
+    """
+    Permissions:
+    - Safe methods (GET, HEAD, OPTIONS): everyone
+    - Create (POST): Admins + Editors
+    - Modify (PUT, PATCH): Admins + Editors
+        (Editors’ changes are saved as pending for admin approval)
+    - Delete: Admins only
+    - View-only: Viewers
+    """
+
     def has_permission(self, request, view):
+        # Safe methods (GET, HEAD, OPTIONS) — allow all
         if request.method in permissions.SAFE_METHODS:
             return True
-        return getattr(request.user, "role", None) in ("admin", "editor")
+
+        # Must be authenticated for unsafe methods
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+
+        role = getattr(user, "role", "").lower()
+
+        # ✅ Allow Create (POST) for Admins + Editors
+        if request.method == "POST":
+            return role in ("admin", "editor")
+
+        # ✅ Allow Modify (PUT, PATCH) for Admins + Editors
+        if request.method in ("PUT", "PATCH"):
+            return role in ("admin", "editor")
+
+        # ✅ Allow Delete for Admins only
+        if request.method == "DELETE":
+            return role == "admin"
+
+        # Deny anything else
+        return False
 
     def has_object_permission(self, request, view, obj):
+        # Safe methods are always allowed
         if request.method in permissions.SAFE_METHODS:
             return True
-        if getattr(request.user, "role", None) == "admin":
+
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+
+        role = getattr(user, "role", "").lower()
+
+        # ✅ Admin has full control
+        if role == "admin":
             return True
-        if getattr(request.user, "role", None) == "editor" and getattr(obj, "uploaded_by", None) == request.user:
+
+        # ✅ Editor can modify but not delete (approval logic handled in view)
+        if role == "editor" and request.method in ("PUT", "PATCH", "POST"):
             return True
+
+        # ❌ Editors cannot delete, viewers cannot modify
         return False
 
 
@@ -42,7 +87,7 @@ class IsAdminEditorOrReadOnly(permissions.BasePermission):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAdminUser]  # keep using Django admin check here
 
 
 # ---------------------------------------------------------------------
@@ -96,7 +141,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         parent_id = request.data.get("parent")
         parent_asset = Asset.objects.filter(pk=parent_id).first() if parent_id else None
 
-        # If it's a new version for an existing asset
+        # If it's a new version for an existing asset (parent provided)
         if parent_asset:
             last_version = parent_asset.version or 1
             new_version_num = last_version + 1
@@ -109,7 +154,7 @@ class AssetViewSet(viewsets.ModelViewSet):
             )
             return av
 
-        # Otherwise, it's a new asset
+        # Otherwise, it's a new asset (admins only — enforced by permission)
         asset = serializer.save(uploaded_by=request.user)
         if tags:
             if isinstance(tags, str):
@@ -145,9 +190,14 @@ class AssetViewSet(viewsets.ModelViewSet):
         """
         asset = self.get_object()
         user = request.user
-        if not getattr(user, "role", None) in ("admin", "editor"):
+        if not user or not getattr(user, "role", None):
             return Response({"detail": "Not allowed"}, status=status.HTTP_403_FORBIDDEN)
 
+        role = getattr(user, "role", "").lower()
+        if role not in ("admin", "editor"):
+            return Response({"detail": "Not allowed"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Editors can request updates; admin can too.
         file = request.data.get("file")
         comment = request.data.get("comment", "")
         title = request.data.get("title", asset.title)
@@ -155,13 +205,13 @@ class AssetViewSet(viewsets.ModelViewSet):
 
         category_id = request.data.get("category")
 
-        # FIX: allow category ID or name
+        # allow category ID or name
         category = None
         if category_id:
             try:
                 category_int = int(category_id)
                 category = Category.objects.filter(id=category_int).first()
-            except ValueError:
+            except (ValueError, TypeError):
                 category = Category.objects.filter(name=category_id).first()
 
         tags_input = request.data.get("tags")  # comma separated
@@ -211,7 +261,8 @@ class AssetVersionViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         user = request.user
 
-        if getattr(user, "role", None) != "admin":
+        # Only admins can approve/reject
+        if getattr(user, "role", "").lower() != "admin":
             return Response({"detail": "Admins only"}, status=status.HTTP_403_FORBIDDEN)
 
         status_value = request.data.get("status")
@@ -233,11 +284,11 @@ class AssetVersionViewSet(viewsets.ModelViewSet):
             if instance.tags.exists():
                 asset.tags.set(instance.tags.all())
 
-            # ✅ FIX: Do NOT overwrite file directly with same FileField instance
-            if instance.file and instance.file.name != asset.file.name:
+            # Do not overwrite file directly with same FileField instance
+            if instance.file and instance.file.name != (asset.file.name if asset.file else ""):
                 # Keep old file intact — only point to the new version’s copy
                 asset.file.save(
-                    instance.file.name.split("/")[-1],  # just the filename
+                    instance.file.name.split("/")[-1],  # filename only
                     instance.file.file,  # file object
                     save=False  # prevent immediate save to avoid double delete
                 )
@@ -247,4 +298,3 @@ class AssetVersionViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-

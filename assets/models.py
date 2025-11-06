@@ -78,11 +78,21 @@ class Asset(models.Model):
     description = models.TextField(blank=True)
     file = models.FileField(upload_to="assets/")
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="uploaded_assets"
     )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_assets"
+    )
+
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -110,6 +120,7 @@ class Asset(models.Model):
     def latest_version(self):
         """Return the latest approved version for this asset."""
         return self.versions.filter(status="approved").order_by("-version").first()
+
 
 
 # ----------------------------------------------------------
