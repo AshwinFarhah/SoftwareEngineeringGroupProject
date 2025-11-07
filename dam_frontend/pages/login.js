@@ -19,11 +19,10 @@ import { useRouter } from "next/router";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
-/** Safe JWT decode (no external deps). Returns null if anything goes wrong. */
+/** ✅ Safe JWT decode (no external deps) */
 function safeDecodeJwt(token) {
   try {
     const payload = token.split(".")[1];
-    // Add padding for base64url if missing
     const pad = payload.length % 4;
     const padded = payload + (pad ? "=".repeat(4 - pad) : "");
     const json = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
@@ -33,17 +32,16 @@ function safeDecodeJwt(token) {
   }
 }
 
-/** Try to fetch the user's role from /me as a fallback */
-async function fetchRoleViaMe(access) {
+/** ✅ Optional: fetch /me endpoint if role or username not inside token */
+async function fetchUserInfo(access) {
   try {
     const res = await fetch(`${API_BASE}/me/`, {
       headers: { Authorization: `Bearer ${access}` },
     });
-    if (!res.ok) return null;
-    const me = await res.json();
-    return (me.role || me.user?.role || "").toString().toLowerCase();
+    if (!res.ok) return {};
+    return await res.json();
   } catch {
-    return null;
+    return {};
   }
 }
 
@@ -55,9 +53,10 @@ export default function Login() {
   const router = useRouter();
   const toast = useToast();
 
-  // If already logged in, go straight to dashboard
+  // Redirect if already logged in
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     if (token) router.replace("/dashboard");
   }, [router]);
 
@@ -72,6 +71,7 @@ export default function Login() {
       });
       return;
     }
+
     if (!username || !password) {
       toast({ title: "Please enter username and password.", status: "warning" });
       return;
@@ -95,27 +95,41 @@ export default function Login() {
       const refresh = data.refresh;
       if (!access) throw new Error("Token missing in response");
 
-      // store tokens
+      // ✅ Store tokens
       localStorage.setItem("access_token", access);
       if (refresh) localStorage.setItem("refresh_token", refresh);
 
-      // extract role from JWT, else from /me
-      let role = "";
+      // ✅ Decode JWT for username + role
       const decoded = safeDecodeJwt(access);
-      role =
-        (decoded?.role ||
-          decoded?.user?.role ||
-          decoded?.permissions?.role ||
-          "").toString().toLowerCase();
+      let decodedUsername =
+        decoded?.username ||
+        decoded?.user?.username ||
+        data?.username ||
+        username;
+      let role =
+        decoded?.role ||
+        decoded?.user?.role ||
+        data?.role ||
+        "";
 
-      if (!role) {
-        const roleFromMe = await fetchRoleViaMe(access);
-        if (roleFromMe) role = roleFromMe;
+      // ✅ Fallback to /me endpoint if missing
+      if (!decodedUsername || !role) {
+        const me = await fetchUserInfo(access);
+        decodedUsername = decodedUsername || me.username || me.user?.username || username;
+        role = role || me.role || me.user?.role || "";
       }
-      if (role) localStorage.setItem("role", role);
 
-      toast({ title: "Signed in successfully.", status: "success", duration: 1500 });
-      router.push("/dashboard"); // change if your post-login route differs
+      // ✅ Save username + role for NavBar
+      localStorage.setItem("username", decodedUsername);
+      localStorage.setItem("role", role.toLowerCase());
+
+      toast({
+        title: "Signed in successfully.",
+        status: "success",
+        duration: 1500,
+      });
+
+      router.push("/dashboard");
     } catch (err) {
       console.error(err);
       toast({
