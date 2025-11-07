@@ -1,7 +1,18 @@
 import { useState, useEffect } from "react";
 import {
-  Box, Heading, VStack, Input, FormControl, FormLabel, Select,
-  Button, useToast, Text, Spinner, Divider, HStack
+  Box,
+  Heading,
+  VStack,
+  Input,
+  FormControl,
+  FormLabel,
+  Select,
+  Button,
+  useToast,
+  Text,
+  Spinner,
+  Divider,
+  HStack,
 } from "@chakra-ui/react";
 import Layout from "../../components/Layout";
 import { useRouter } from "next/router";
@@ -10,7 +21,7 @@ export default function UserManagement() {
   const router = useRouter();
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState([]); // ✅ safe default
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({
@@ -21,8 +32,10 @@ export default function UserManagement() {
     password: "",
     role: "",
   });
+
   const toast = useToast();
 
+  // ✅ Fetch auth details & users
   useEffect(() => {
     const t = localStorage.getItem("access_token");
     const r = localStorage.getItem("role");
@@ -33,23 +46,28 @@ export default function UserManagement() {
     setToken(t);
     setRole(r);
     if (r === "admin") fetchUsers(t);
+    else setLoading(false);
   }, []);
 
+  // ✅ Fetch users
   async function fetchUsers(t) {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/`, {
         headers: { Authorization: `Bearer ${t}` },
       });
+      if (!res.ok) throw new Error("Failed to fetch users");
       const data = await res.json();
-      setUsers(data.results || data);
+      setUsers(Array.isArray(data.results) ? data.results : data); // ✅ prevent .map crash
     } catch (err) {
       console.error(err);
       toast({ title: "Failed to load users", status: "error" });
+      setUsers([]); // ✅ safe fallback
     } finally {
       setLoading(false);
     }
   }
 
+  // ✅ Save (Create/Update) user
   async function handleSaveUser() {
     if (!form.username || !form.role) {
       toast({ title: "Please fill all required fields", status: "warning" });
@@ -59,7 +77,6 @@ export default function UserManagement() {
     const url = editingUser
       ? `${process.env.NEXT_PUBLIC_API_URL}/users/${editingUser.id}/`
       : `${process.env.NEXT_PUBLIC_API_URL}/users/`;
-
     const method = editingUser ? "PUT" : "POST";
 
     try {
@@ -77,15 +94,7 @@ export default function UserManagement() {
           title: editingUser ? "User updated successfully" : "User created successfully",
           status: "success",
         });
-        setForm({
-          username: "",
-          first_name: "",
-          last_name: "",
-          email: "",
-          password: "",
-          role: "",
-        });
-        setEditingUser(null);
+        resetForm();
         fetchUsers(token);
       } else {
         const err = await res.json();
@@ -101,6 +110,7 @@ export default function UserManagement() {
     }
   }
 
+  // ✅ Delete user
   async function handleDeleteUser(id) {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
@@ -111,6 +121,8 @@ export default function UserManagement() {
       if (res.ok) {
         toast({ title: "User deleted", status: "info" });
         fetchUsers(token);
+      } else {
+        toast({ title: "Failed to delete user", status: "error" });
       }
     } catch (err) {
       console.error(err);
@@ -118,6 +130,7 @@ export default function UserManagement() {
     }
   }
 
+  // ✅ Edit mode
   function handleEditUser(u) {
     setEditingUser(u);
     setForm({
@@ -130,7 +143,20 @@ export default function UserManagement() {
     });
   }
 
-  if (role !== "admin") {
+  function resetForm() {
+    setForm({
+      username: "",
+      first_name: "",
+      last_name: "",
+      email: "",
+      password: "",
+      role: "",
+    });
+    setEditingUser(null);
+  }
+
+  // ✅ Access restriction
+  if (role && role !== "admin") {
     return (
       <Layout>
         <Box p={8}>
@@ -142,13 +168,24 @@ export default function UserManagement() {
     );
   }
 
-  if (loading) return <Spinner size="xl" />;
+  if (loading) {
+    return (
+      <Layout>
+        <Box p={8} textAlign="center">
+          <Spinner size="xl" />
+          <Text mt={4}>Loading users...</Text>
+        </Box>
+      </Layout>
+    );
+  }
 
+  // ✅ Main UI
   return (
     <Layout>
       <Box p={8}>
         <Heading mb={6}>👤 User Management</Heading>
 
+        {/* User Form */}
         <Box bg="gray.50" p={6} rounded="xl" shadow="md">
           <Heading size="md" mb={4}>
             {editingUser ? "Edit User" : "Create New User"}
@@ -191,7 +228,7 @@ export default function UserManagement() {
               <FormLabel>Password</FormLabel>
               <Input
                 type="password"
-                placeholder={editingUser ? "Leave blank to keep current password" : ""}
+                placeholder={editingUser ? "Enter new or existing password" : ""}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
@@ -215,7 +252,7 @@ export default function UserManagement() {
                 {editingUser ? "Save Changes" : "Create User"}
               </Button>
               {editingUser && (
-                <Button variant="ghost" onClick={() => setEditingUser(null)}>
+                <Button variant="ghost" onClick={resetForm}>
                   Cancel
                 </Button>
               )}
@@ -225,37 +262,48 @@ export default function UserManagement() {
 
         <Divider my={8} />
 
+        {/* Existing Users */}
         <Heading size="md" mb={4}>
           Existing Users
         </Heading>
-        {users.length === 0 ? (
-          <Text color="gray.500">No users found.</Text>
-        ) : (
+        {Array.isArray(users) && users.length > 0 ? (
           <VStack align="stretch" spacing={3}>
             {users.map((u) => (
               <Box
-                key={u.id}
+                key={u.id || u.username}
                 p={4}
                 bg="white"
                 shadow="sm"
                 rounded="md"
                 borderWidth="1px"
               >
-                <Text><b>Username:</b> {u.username}</Text>
-                <Text><b>Email:</b> {u.email}</Text>
-                <Text><b>Role:</b> {u.role}</Text>
+                <Text>
+                  <b>Username:</b> {u.username}
+                </Text>
+                <Text>
+                  <b>Email:</b> {u.email || "—"}
+                </Text>
+                <Text>
+                  <b>Role:</b> {u.role || "N/A"}
+                </Text>
 
                 <HStack mt={2}>
                   <Button size="sm" colorScheme="teal" onClick={() => handleEditUser(u)}>
                     Edit
                   </Button>
-                  <Button size="sm" colorScheme="red" onClick={() => handleDeleteUser(u.id)}>
+                  <Button
+                    size="sm"
+                    colorScheme="red"
+                    onClick={() => handleDeleteUser(u.id)}
+                  >
                     Delete
                   </Button>
                 </HStack>
               </Box>
             ))}
           </VStack>
+        ) : (
+          <Text color="gray.500">No users found.</Text>
         )}
       </Box>
     </Layout>
