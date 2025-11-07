@@ -444,52 +444,43 @@ export default function AssetDetails() {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    <Th>Version</Th><Th>Updated By</Th><Th>Date</Th><Th>Status</Th>{role==="admin" && <Th>Actions</Th>}
+                    <Th>Version</Th>
+                    <Th>Updated By</Th>
+                    <Th>Date</Th>
+                    <Th>Status</Th>
+                    {role === "admin" && <Th>Actions</Th>}
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {versions.map(v => {
-                    const pvRaw = v.file ? (v.file.startsWith("http") ? v.file : `${base}${v.file}`) : "";
-                    const pv = cacheBust ? `${pvRaw}${pvRaw.includes("?") ? "&" : "?"}cb=${cacheBust}` : pvRaw;
-                    const vk = detectKind(v.file || "");
-                    return (
-                      <Tr key={v.id}>
-                        <Td>{v.version}</Td>
-                        <Td>{v.uploaded_by?.username || "N/A"}</Td>
-                        <Td>{v.uploaded_at ? new Date(v.uploaded_at).toLocaleString() : "—"}</Td>
-                        <Td>
-                          <Badge colorScheme={v.status==="approved"?"green":v.status==="pending"?"yellow":"red"}>
-                            {v.status}
-                          </Badge>
-                        </Td>
-                        {role==="admin" && (
-                          <Td>
-                            <HStack spacing={2}>
-                              {v.status==="pending" && (
-                                <>
-                                  <Button size="sm" colorScheme="green" onClick={()=>approveVersion(v.id,true)}>Approve</Button>
-                                  <Button size="sm" colorScheme="red" onClick={()=>approveVersion(v.id,false)}>Reject</Button>
-                                  {vk==="model" ? (
-                                    <Button size="sm" colorScheme="blue"
-                                      onClick={()=>openModelInNewTab({ srcUrl: pvRaw, token, title: `v${v.version} – ${v.title || asset?.title || "3D Model"}` })}
-                                    >Open</Button>
-                                  ) : (
-                                    <Button size="sm" colorScheme="blue" onClick={()=>{ setPreviewVersion(v); onOpen(); }}>Preview</Button>
-                                  )}
-                                </>
-                              )}
-                            </HStack>
-                          </Td>
-                        )}
-                      </Tr>
-                    );
-                  })}
+                  {versions.map(v => (
+                    <Tr key={v.id}>
+                      <Td>{v.version}</Td>
+                      <Td>{v.uploaded_by?.username || "N/A"}</Td>
+                      <Td>{new Date(v.uploaded_at).toLocaleString()}</Td>
+                      <Td>
+                        <Badge colorScheme={v.status === "approved" ? "green" : v.status === "pending" ? "yellow" : "red"}>
+                          {v.status}
+                        </Badge>
+                      </Td>
+                      <Td>
+                        <HStack spacing={2}>
+                          <Button size="sm" colorScheme="blue" onClick={() => { setPreviewVersion(v); onOpen(); }}>View</Button>
+                          {role === "admin" && v.status === "pending" && (
+                            <>
+                              <Button size="sm" colorScheme="green" onClick={() => approveVersion(v.id, true)}>Approve</Button>
+                              <Button size="sm" colorScheme="red" onClick={() => approveVersion(v.id, false)}>Reject</Button>
+                            </>
+                          )}
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  ))}
                 </Tbody>
               </Table>
             </>
           )}
 
-          {/* Modal for non-3D preview */}
+          {/* -------- Modal Preview -------- */}
           {previewVersion && (
             <Modal isOpen={isOpen} onClose={() => { onClose(); setPreviewVersion(null); }} size="xl">
               <ModalOverlay />
@@ -507,9 +498,22 @@ export default function AssetDetails() {
                     const pvRaw = previewVersion.file.startsWith("http") ? previewVersion.file : `${base}${previewVersion.file}`;
                     const pvUrl = cacheBust ? `${pvRaw}${pvRaw.includes("?") ? "&" : "?"}cb=${cacheBust}` : pvRaw;
                     const k = detectKind(previewVersion.file);
-                    if (k==="image") return <Image src={pvUrl} maxH="300px" mx="auto" mt={3} rounded="lg" shadow="sm" />;
-                    if (k==="video") return <video src={pvUrl} controls width="100%" style={{ borderRadius:12, marginTop:12 }} />;
-                    if (k==="pdf")   return <embed src={pvUrl} type="application/pdf" width="100%" height="300px" />;
+                    if (k === "image")
+                      return <Image src={pvUrl} maxH="300px" mx="auto" mt={3} rounded="lg" shadow="sm" />;
+                    if (k === "video")
+                      return <video src={pvUrl} controls width="100%" style={{ borderRadius: 12, marginTop: 12 }} />;
+                    if (k === "pdf")
+                      return <embed src={pvUrl} type="application/pdf" width="100%" height="300px" />;
+                    if (k === "model")
+                      return (
+                        <model-viewer
+                          src={pvUrl}
+                          camera-controls
+                          auto-rotate
+                          environment-image="neutral"
+                          style={{ width: "100%", height: 300, borderRadius: 12, background: "transparent", marginTop: 12 }}
+                        />
+                      );
                     return <Text mt={3}>No file preview available.</Text>;
                   })()}
                 </ModalBody>
