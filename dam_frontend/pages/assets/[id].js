@@ -133,61 +133,65 @@ export default function AssetDetails() {
   }
 
   /* ---------- save: editor requests, admin patches directly ---------- */
-  async function handleUpdate() {
-    try {
-      if (!token) return;
+async function handleUpdate() {
+  try {
+    if (!token) return;
 
-      const fd = new FormData();
-      fd.append("title", updated.title ?? "");
-      fd.append("description", updated.description ?? "");
-      fd.append("tags", updated.tags ?? "");
+    const fd = new FormData();
+    fd.append("title", updated.title ?? "");
+    fd.append("description", updated.description ?? "");
+    fd.append("tags", updated.tags ?? "");
 
-      const catId = updated.category_id ? String(updated.category_id) : "";
-      if (catId) {
-        // include both keys in case backend expects either
-        fd.append("category", catId);
-        fd.append("category_id", catId);
-      }
-      if (updated.file) {
-        fd.append("file", updated.file);
-      }
-
-      if (role === "editor") {
-        if (!updated.file) {
-          toast({ title: "Editors must attach a new file for update request.", status: "warning" });
-          return;
-        }
-        const r = await fetch(`${API}/assets/${id}/request_update/`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
-        if (!r.ok) throw new Error(await r.text());
-        toast({ title: "Submitted for admin approval.", status: "success" });
-      } else {
-        const r = await fetch(`${API}/assets/${id}/`, {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
-        if (!r.ok) throw new Error(await r.text());
-        toast({ title: "Asset updated.", status: "success" });
-      }
-
-      // reset local file state + bump cache key to force preview refresh
-      setIsEditing(false);
-      setUpdated(u => ({ ...u, file: null }));
-      if (localPreviewUrl) { URL.revokeObjectURL(localPreviewUrl); setLocalPreviewUrl(null); }
-      setCacheBust(Date.now());
-
-      // re-fetch fresh metadata (and new file path if backend changed it)
-      await fetchAsset(token, id);
-      await fetchVersions(token, id);
-    } catch (e) {
-      console.error(e);
-      toast({ title: "Update failed", description: String(e.message || e), status: "error" });
+    const catId = updated.category_id ? String(updated.category_id) : "";
+    if (catId) {
+      fd.append("category", catId);
+      fd.append("category_id", catId);
     }
+    if (updated.file) fd.append("file", updated.file);
+
+    if (role === "editor") {
+      if (!updated.file) {
+        toast({ title: "Editors must attach a new file for update request.", status: "warning" });
+        return;
+      }
+      const r = await fetch(`${API}/assets/${id}/request_update/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "Submitted for admin approval.", status: "success" });
+    } else {
+      const r = await fetch(`${API}/assets/${id}/`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "Asset updated.", status: "success" });
+    }
+
+    // reset editor state
+    setIsEditing(false);
+    setUpdated(u => ({ ...u, file: null }));
+    if (localPreviewUrl) { URL.revokeObjectURL(localPreviewUrl); setLocalPreviewUrl(null); }
+    setCacheBust(Date.now());
+
+    // ✅ re-fetch the latest asset metadata
+    const freshRes = await fetch(`${API}/assets/${id}/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const freshAsset = await freshRes.json();
+    setAsset(freshAsset);  // <--- this ensures frontend uses the latest file
+
+    // fetch latest versions for version history
+    await fetchVersions(token, id);
+  } catch (e) {
+    console.error(e);
+    toast({ title: "Update failed", description: String(e.message || e), status: "error" });
   }
+}
+
 
   async function handleDelete() {
     if (!confirm("Delete this asset?")) return;
@@ -243,8 +247,6 @@ export default function AssetDetails() {
   return (
     <Layout>
       {/* model-viewer for 3D models */}
-      <Script strategy="afterInteractive" type="module"
-        src="https://unpkg.com/@google/model-viewer@latest/dist/model-viewer.min.js" />
 
       <Box px={6} py={6}>
         <Heading mb={4}>Asset Details</Heading>

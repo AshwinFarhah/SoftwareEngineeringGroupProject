@@ -4,7 +4,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.hashers import make_password
 
 
-# ✅ JWT Token Serializer with role
+# ================= JWT Token Serializer with role =================
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -20,20 +20,14 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
-# ✅ User Serializer for Admin CRUD
+# ================= User Serializer for Admin CRUD =================
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
         fields = [
-            "id",
-            "username",
-            "first_name",
-            "last_name",
-            "email",
-            "password",
-            "role",
+            "id", "username", "first_name", "last_name", "email", "password", "role"
         ]
         extra_kwargs = {"password": {"write_only": True}}
 
@@ -55,7 +49,7 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
 
-# ✅ Tag & Category Serializers
+# ================= Tag & Category Serializers =================
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
@@ -68,36 +62,25 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
-# ✅ AssetVersion Serializer (with metadata)
+# ================= AssetVersion Serializer =================
 class AssetVersionSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     category = CategorySerializer(read_only=True)
-    # Optional write-only fields if needed
     category_id = serializers.IntegerField(write_only=True, required=False)
     tag_names = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = AssetVersion
         fields = [
-            "id",
-            "file",
-            "uploaded_at",
-            "uploaded_by",
-            "version",
-            "status",
-            "comment",
-            "title",
-            "description",
-            "category",
-            "category_id",
-            "tags",
-            "tag_names",
+            "id", "file", "uploaded_at", "uploaded_by", "version", "status",
+            "comment", "title", "description", "category", "category_id",
+            "tags", "tag_names"
         ]
         read_only_fields = ["uploaded_at", "uploaded_by", "version", "status"]
 
 
-# ✅ Asset Serializer (always returns latest approved version)
+# ================= Asset Serializer =================
 class AssetSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
     category_id = serializers.IntegerField(write_only=True, required=False)
@@ -107,26 +90,13 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = [
-            "id",
-            "title",
-            "description",
-            "file",
-            "uploaded_at",
-            "uploaded_by",
-            "category_id",
-            "tags",
-            "metadata",
-            "version",
-            "parent",
-            "versions",
+            "id", "title", "description", "file", "uploaded_at", "uploaded_by",
+            "category_id", "tags", "metadata", "version", "parent", "versions"
         ]
         read_only_fields = ("uploaded_by", "version", "uploaded_at", "versions")
 
+    # Return latest approved version for frontend
     def to_representation(self, instance):
-        """
-        Override default representation to show latest approved version's data
-        for title, description, file, category, tags.
-        """
         rep = super().to_representation(instance)
         latest = instance.latest_version()
         if latest:
@@ -147,6 +117,7 @@ class AssetSerializer(serializers.ModelSerializer):
             rep["tags"] = TagSerializer(instance.tags.all(), many=True).data
         return rep
 
+    # Create new asset
     def create(self, validated_data):
         category_id = validated_data.pop("category_id", None)
         tag_names = validated_data.pop("tag_names", None)
@@ -154,7 +125,7 @@ class AssetSerializer(serializers.ModelSerializer):
 
         asset = Asset.objects.create(**validated_data)
 
-        # assign category if provided
+        # Assign category
         if category_id:
             try:
                 category = Category.objects.get(pk=category_id)
@@ -162,12 +133,13 @@ class AssetSerializer(serializers.ModelSerializer):
             except Category.DoesNotExist:
                 pass
 
-        # handle tags (from string or list)
+        # Assign tags from tag_names
         if tag_names:
             for t in [x.strip() for x in tag_names.split(",") if x.strip()]:
                 tag_obj, _ = Tag.objects.get_or_create(name=t)
                 asset.tags.add(tag_obj)
 
+        # Assign tags from tags_data
         for t in tags_data:
             tag_obj, _ = Tag.objects.get_or_create(name=t.get("name"))
             asset.tags.add(tag_obj)
@@ -175,15 +147,20 @@ class AssetSerializer(serializers.ModelSerializer):
         asset.save()
         return asset
 
+    # Update asset and create new AssetVersion if file or admin edit
     def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
         category_id = validated_data.pop("category_id", None)
         tag_names = validated_data.pop("tag_names", None)
         tags_data = validated_data.pop("tags", None)
+        new_file = validated_data.pop("file", None)
 
+        # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # update category if provided
+        # Update category
         if category_id:
             try:
                 category = Category.objects.get(pk=category_id)
@@ -191,18 +168,39 @@ class AssetSerializer(serializers.ModelSerializer):
             except Category.DoesNotExist:
                 pass
 
-        # update tags
+        # Update tags from tag_names
         if tag_names is not None:
             instance.tags.clear()
             for t in [x.strip() for x in tag_names.split(",") if x.strip()]:
                 tag_obj, _ = Tag.objects.get_or_create(name=t)
                 instance.tags.add(tag_obj)
 
+        # Update tags from tags_data
         if tags_data is not None:
             instance.tags.clear()
             for t in tags_data:
                 tag_obj, _ = Tag.objects.get_or_create(name=t.get("name"))
                 instance.tags.add(tag_obj)
+
+        # Create a new AssetVersion if file is updated or admin edits
+        if new_file or (user and user.role == "admin"):
+            latest_version = instance.latest_version()
+            version_number = (latest_version.version + 1) if latest_version else 1
+
+            asset_version = AssetVersion.objects.create(
+                asset=instance,
+                file=new_file if new_file else instance.file,
+                uploaded_by=user if user else None,
+                version=version_number,
+                status="approved",
+                title=validated_data.get("title", instance.title),
+                description=validated_data.get("description", instance.description),
+                category=instance.category
+            )
+
+            # Copy tags to version
+            for tag in instance.tags.all():
+                asset_version.tags.add(tag)
 
         instance.save()
         return instance

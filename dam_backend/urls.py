@@ -4,7 +4,7 @@ from django.urls import path, include
 from rest_framework import routers
 from assets.views import (
     UserViewSet, AssetViewSet, CategoryViewSet,
-    TagViewSet, AssetVersionViewSet, MyTokenObtainPairView
+    TagViewSet, AssetVersionViewSet, MyTokenObtainPairView, me_view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
@@ -23,6 +23,7 @@ def home(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
+    path("api/me/", me_view, name="me"),  # ✅ added route
     path("api/token/", MyTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("", home),

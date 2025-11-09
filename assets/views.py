@@ -9,6 +9,19 @@ from .serializers import (
 )
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me_view(request):
+    """Return authenticated user's info."""
+    user = request.user
+    return Response({
+        "id": user.id,
+        "username": user.username,
+        "role": getattr(user, "role", None),
+    })
 
 # ---------------------------------------------------------------------
 # AUTH VIEW
@@ -89,6 +102,16 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]  # keep using Django admin check here
 
+# ---------------------------------------------------------------------
+# CUSTOM PERMISSIONS FOR CATEGORY
+# ---------------------------------------------------------------------
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """Allow only admins to create/update/delete; everyone can read."""
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        user = request.user
+        return user.is_authenticated and getattr(user, "role", "").lower() == "admin"
 
 # ---------------------------------------------------------------------
 # CATEGORY + TAGS
@@ -96,7 +119,8 @@ class UserViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]
+    pagination_class = None  # optional, to simplify test_get_categories_list
 
 
 class TagViewSet(viewsets.ModelViewSet):
