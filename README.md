@@ -23,12 +23,14 @@ Backend
 - Django Admin
 
 The system supports 3 main roles:
+
 Role	Permissions
 Admin: Full control: user management, approve updates, edit/delete all assets
 Editor: Upload assets, edit their own assets, request updates
 Viewer: View and download approved assets
 
 Main Features
+
 ✔️ 1. User Authentication & Role Access
 Login using SimpleJWT
 Tokens contain user role → used for frontend access control
