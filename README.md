@@ -1,12 +1,10 @@
 # SoftwareEngineeringGroupProject
 
 Digital Asset Management System (Django + Next.js + PostgreSQL)
-
 A full-stack digital asset management platform built using Django REST Framework, Next.js (React) and PostgreSQL, 
 designed to support secure asset uploads, metadata handling, version control, admin approval workflows and role-based access control.
 
 Overview
-
 This system allows organizations to store, manage and retrieve digital assets efficiently. It includes JWT authentication, user roles, 
 asset versioning, drag-and-drop uploads and a full admin panel for managing users and approval requests.
 
